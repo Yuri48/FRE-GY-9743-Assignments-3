@@ -33,14 +33,24 @@ class ProductDisplayVisitor(ProductVisitor):
 
     @visit.register
     def _(self, product: ProductFixedAccruedCashflow):
-        #TODO 5: Use _common_items, then collect these fields in order:
-        # Effective Date, Termination Date, Accrual Basis, Payment Date,
-        # Business Day Convention, Holiday Convention.
-        raise NotImplementedError("TODO 5: Fixed cashflow display visitor")
+        self._common_items(product)
+        self.nvps_ += [
+            ["Effective Date", product.effective_date.ISO()],
+            ["Termination Date", product.termination_date.ISO()],
+            ["Accrual Basis", product.accrual_basis.value_str],
+            ["Payment Date", product.payment_date.ISO()],
+            ["Business Day Convention", product.business_day_convention.value_str],
+            ["Holiday Convention", product.holiday_convention.value_str],
+        ]
 
     @visit.register
     def _(self, product: ProductOvernightIndexCashflow):
-        #TODO 6: Use _common_items, then collect these fields in order:
-        # Effective Date, Termination Date, ON Index, Compounding Method,
-        # Spread, Payment Date.
-        raise NotImplementedError("TODO 6: Overnight cashflow display visitor")
+        self._common_items(product)
+        self.nvps_ += [
+            ["Effective Date", product.effective_date.ISO()],
+            ["Termination Date", product.termination_date.ISO()],
+            ["ON Index", product.on_index_str_],
+            ["Compounding Method", product.compounding_method.to_string().upper()],
+            ["Spread", product.spread],
+            ["Payment Date", product.payment_date.ISO()],
+        ]

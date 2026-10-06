@@ -1,0 +1,151 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,enumitem,hyperref}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\setlist{nosep}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\newcommand{\AI}{\mathrm{AI}}
+\newcommand{\BF}{\mathrm{BF}}
+
+\title{FRE-GY 9743 --- Assignment 3\\ \large Bond Futures: Conversion Factor, Implied Repo and the Cheapest-to-Deliver}
+\author{Yuri Moghaddam}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\noindent\textbf{Repository (computational part: cashflow products and display visitor):}\\
+\url{https://github.com/Yuri48/FRE-GY-9743-Assignments-3/tree/Yuri_Moghaddam_Branch}\\
+Every number below is reproduced by \texttt{hw3\_bond\_future\_numbers.py} in the same repository.
+
+\section*{Setup and notation}
+Prices are per 100 face. $S$ is the clean spot price, $\AI(t)$ the accrued interest, $S^{d}=S+\AI(0)$ the dirty spot price, $T_d$ the delivery date and $\tau$ the repo accrual factor to $T_d$. Repo is a money-market simple rate; three months is $\tau=0.25$ (90 days on ACT/360). Buying the bond today with repo financing and delivering it at $T_d$ gives the forward price
+\[
+\BF^{d}=S^{d}(1+r\tau)-\sum_{t_i\le T_d}c_i\bigl(1+r(T_d-t_i)\bigr),\qquad
+\BF=\BF^{d}-\AI(T_d),
+\]
+where $\BF$ is the \emph{clean} forward and the sum runs over coupons paid before delivery.
+
+The bond in Question 1 has exactly 9 years to maturity, a 4\% semi-annual coupon and $S=100$. Today is therefore a coupon date: $\AI(0)=0$, $S^{d}=100$, the yield is 4\%, and the next coupon is six months away, after delivery.
+
+\section*{1. Normalized forward price}
+
+\paragraph{1) Three-month forward at $r_{\text{mkt}}=2\%$.}
+No coupon is paid before $T_d$, so
+\begin{align*}
+\BF^{d}&=100\,(1+0.02\times0.25)=100.5000,\\
+\AI(T_d)&=100\times\tfrac{0.04}{2}\times\tfrac{3}{6}=1.0000,\\
+\BF&=100.5000-1.0000=\mathbf{99.5000}.
+\end{align*}
+Equivalently, the clean forward is spot minus carry. Over three months the bond earns $1.00$ of coupon ($4\%\times0.25$) and costs $0.50$ to finance ($2\%\times0.25$). Carry is $+0.50$, so $\BF=100-0.50=99.50$. The forward is below spot because the coupon yield (4\%) exceeds the repo rate (2\%).
+
+\paragraph{2) Conversion factor.}
+With 18 semi-annual periods, $v=1/1.03$ and $c/y=0.04/0.06$:
+\[
+K=\frac{1}{100}\Bigl[\,2\sum_{i=1}^{18}v^{i}+100\,v^{18}\Bigr]
+=\frac{c}{y}+\Bigl(1-\frac{c}{y}\Bigr)v^{18}
+=0.666667+0.333333\times0.587395=\mathbf{0.862465}.
+\]
+The bond pays 4\%, below the 6\% notional coupon, so it trades below par at 6\% and $K<1$.\footnote{The CME computes $K$ from the bond's remaining maturity on the first day of the delivery month, rounded down to a whole quarter. That would be 8.75 years here, giving $K=0.865306$ and $\BF/K=114.988$. I use the assignment's definition (9 years); it is the one consistent with the futures price quoted in Question 2.}
+
+\paragraph{3) Normalized forward.}
+\[
+\frac{\BF}{K}=\frac{99.5000}{0.862465}=\mathbf{115.3670}.
+\]
+
+\paragraph{4) What the conversion factor does.}
+\begin{itemize}[leftmargin=*]
+\item \textbf{It puts every deliverable bond on a common scale.} Bonds in the basket have different coupons and maturities, so their raw prices cannot be compared: at the same yield, a 2\% bond might trade at 80 and a 6\% bond at 100. $K_x$ is the price per unit face that bond $x$ would have if it yielded 6\%. It says how many units of the hypothetical 6\% notional bond one unit of bond $x$ is worth. Dividing by $K_x$ expresses each bond's forward in units of the notional bond, so a single futures price $F$ covers the whole basket. Delivering one unit face of bond $x$ is paid $F\,K_x$ plus accrued interest.
+\item \textbf{The normalization is exact only at 6\%.} If the curve were flat at 6\%, $S_x/K_x=100$ for every bond (this holds exactly in the three-bond example of Question 3), and the short would be indifferent between deliverable bonds apart from carry. At any other yield the scaling is imperfect, which is why a cheapest-to-deliver bond exists (Question 3).
+\item \textbf{Accrued interest (the hint).} $K$ is a ratio of \emph{clean} prices, so it rescales only the clean part of the price. Accrued interest is a known cash amount owed to the seller for the coupon earned since the last payment. It is not rescaled; it is paid in full on top:
+\[
+\text{invoice}_x=F\,K_x+\AI_x(T_d).
+\]
+The forward therefore has to be converted to clean before it is divided by $K$, which is why $\AI(T_d)=1.00$ was subtracted in part 1). Dividing the dirty forward instead gives $100.50/0.862465$ $=116.53$, which effectively pays $1.00/K=1.16$ of accrued instead of $1.00$. That error would also vary across the basket with each bond's position in its coupon cycle: just after a coupon $\AI\approx0$, just before one $\AI\approx c/2$. Working with clean prices removes coupon timing from the comparison, and the accrued interest is passed through unchanged.
+\end{itemize}
+
+\section*{2. Cheapest-to-deliver}
+
+\paragraph{1) Implied repo at $F=115.3670$.}
+Set $\BF(S,r^{\text{imp}},T_d)/K=F$. With no coupon before delivery this is $F K+\AI(T_d)=S^{d}(1+r^{\text{imp}}\tau)$, so
+\begin{align*}
+r^{\text{imp}}&=\frac{1}{\tau}\Bigl[\frac{F K+\AI(T_d)}{S^{d}}-1\Bigr]
+=\frac{1}{0.25}\Bigl[\frac{115.3670\times0.862465+1.0000}{100}-1\Bigr]\\
+&=\frac{1}{0.25}\Bigl[\frac{100.5000}{100}-1\Bigr]=\mathbf{2.00\%}
+\end{align*}
+(1.99994\% before rounding $F$ to four decimals). The implied repo equals the market repo because the quoted futures price is exactly this bond's normalized forward at 2\%. A cash-and-carry with this bond earns exactly the funding rate, which is what we expect if it is the CTD and there is no arbitrage. If a coupon $c_i$ fell at $t_i<T_d$, the formula would become $r^{\text{imp}}=\bigl[F K+\AI(T_d)+\sum c_i-S^{d}\bigr]/\bigl[S^{d}\tau-\sum c_i(T_d-t_i)\bigr]$.
+
+Implied repo is very sensitive to the futures price over short horizons: $\partial r^{\text{imp}}/\partial F=K/(S^{d}\tau)=3.45\%$ per point, so one 32nd of a point moves it by about 10.8\,bp.
+
+\paragraph{2) Choosing the CTD from implied repos.}
+$r^{\text{imp}}_x$ is the return on a cash-and-carry with bond $x$: buy it spot (pay $S^{d}_x$), sell the future, hold to $T_d$ and deliver it for $F K_x+\AI_x(T_d)$. Because $\BF_x$ increases in $r$ and $F=\min_x \BF_x(r_{\text{mkt}})/K_x$,
+\[
+F\le\frac{\BF_x(r_{\text{mkt}})}{K_x}\ \ \forall x
+\quad\Longrightarrow\quad
+r^{\text{imp}}_x\le r_{\text{mkt}}\ \ \forall x,
+\]
+with equality for the bond that attains the minimum. Hence
+\[
+\textbf{CTD}=\argmax_{x\in\mathcal X} r^{\text{imp}}_x ,
+\]
+the bond with the highest implied repo, which should be close to $r_{\text{mkt}}$. Following the hint, the short (the party that delivers) reacts to $r_{\text{mkt}}\ne r^{\text{imp}}$ as follows:
+\begin{itemize}[leftmargin=*]
+\item $r^{\text{imp}}_x>r_{\text{mkt}}$: borrow at $r_{\text{mkt}}$ in repo, buy bond $x$, sell the future and deliver. This locks in $r^{\text{imp}}_x-r_{\text{mkt}}$ without risk. Buying the bond and selling the future pushes $S_x$ up and $F$ down until $r^{\text{imp}}_x=r_{\text{mkt}}$, so in equilibrium the highest implied repo is about $r_{\text{mkt}}$.
+\item $r^{\text{imp}}_x<r_{\text{mkt}}$: delivering $x$ earns less than the cost of financing it. The short would rather deliver another bond, or simply lend cash at $r_{\text{mkt}}$. The further $r^{\text{imp}}_x$ is below $r_{\text{mkt}}$, the more expensive $x$ is to deliver.
+\end{itemize}
+So I would rank the basket by implied repo, take the highest as today's CTD, and compare it with the term repo actually available for that bond: the GC rate, or the bond's own special rate if it trades special. An equivalent price measure is the net basis $\BF_x(r_{\text{mkt}})-F K_x$; the CTD has the smallest. In practice the highest implied repo sits slightly \emph{below} GC because the short owns the delivery options (quality/switch, timing, end-of-month, wild card). The futures price therefore trades a little under $\min_x \BF_x/K_x$, and the CTD's net basis is positive by roughly the value of those options. Example from Question 3(b) at a flat 6.25\% yield: implied repos are A 1.59\%, B 2.00\%, C 1.51\%, so B is the CTD.
+
+\section*{3. Scenario analysis}
+
+\paragraph{Can the CTD at $t+N$ be predicted?}
+Yes, conditional on a scenario. The conversion factors are fixed for the life of the contract, so the CTD at $t+N$ is
+\[
+\text{CTD}(t+N)=\argmin_{x}\ \frac{\BF_x\bigl(S_x(t+N),\,r(t+N),\,T_d\bigr)}{K_x}.
+\]
+For each scenario of the curve at $t+N$ (level, slope, repo, specialness), reprice every deliverable bond, recompute the normalized forwards or implied repos with the remaining carry, and take the minimum. A grid of scenarios, or a simulation of curve factors, gives a distribution of the CTD. From it we get the probability of a switch and the value of the short's delivery option. The main drivers:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Yield level relative to the 6\% notional coupon.} To first order\[S_x(y)/K_x=100\,P_x(y)/P_x(6\%)\approx100\,e^{D_x(6\%-y)},\]where $D_x$ is duration. Below 6\% this ratio rises with duration, so the \emph{lowest-duration} bond (short maturity, high coupon) is cheapest. Above 6\% it falls with duration, so the \emph{highest-duration} bond (long maturity, low coupon) is cheapest. At exactly 6\% all ratios equal 100 and carry decides.
+\item \textbf{Curve slope.} A steepening (long yields up relative to short) cheapens the long bonds and moves the CTD toward longer maturities. A flattening moves it toward shorter maturities.
+\item \textbf{Distance from a switch point.} When normalized forwards are far apart, the CTD is stable. When they are close (yields near 6\%, or bonds of similar duration), small moves change it.
+\item \textbf{Carry, repo and supply.} Higher-coupon bonds have more positive carry when coupons exceed repo, which lowers their forwards. Carry shrinks as $T_d$ approaches, so $\BF_x\to S_x$ and the CTD at delivery is $\argmin_x S_x(T_d)/K_x$. A bond trading special in repo, a squeeze on the CTD, a new issue entering the basket or a bond aging out of it can all change the answer.
+\end{enumerate}
+
+\paragraph{Example.}
+Hypothetical basket, repo 2\%, 3 months to delivery, flat curve unless twisted. Bonds are A (5.75\%, 7y), B (4\%, 9y; the bond from Question 1) and C (2\%, 10y). Their conversion factors are $K=0.9859,\ 0.8625,\ 0.7025$ and their modified durations at 4\% are 5.8, 7.5 and 8.8.
+
+\begin{center}
+\begin{tabular}{lrrrrrr}
+\toprule
+$\BF/K$ at flat yield & 3\% & 4\% & 5\% & 6\% & 7\% & 8\% \\
+\midrule
+A 5.75\% 7y & \textbf{118.063} & \textbf{111.280} & \textbf{104.950} & \textbf{99.042} & 93.524 & 88.367 \\
+B 4.00\% 9y & 124.498 & 115.367 & 107.004 & 99.341 & 92.313 & 85.864 \\
+C 2.00\% 10y & 130.077 & 118.965 & 108.904 & 99.788 & \textbf{91.524} & \textbf{84.028} \\
+\bottomrule
+\end{tabular}
+\end{center}
+The CTD (bold) is the short, high-coupon bond A up to a 6.19\% flat yield, then B up to 6.34\%, then the long, low-coupon bond C. At exactly 6\%, A is still cheapest because of its higher carry. At a 6.25\% level, a twist around the 9-year point is enough to move the CTD:
+\begin{center}
+\begin{tabular}{lrrrrr}
+\toprule
+Slope (bp per year of maturity) & $-10$ & $-5$ & $0$ & $+5$ & $+10$ \\
+\midrule
+CTD at a 6.25\% level & A & A & B & C & C \\
+CTD at a 4\% level & A & A & A & A & A \\
+\bottomrule
+\end{tabular}
+\end{center}
+At 4\% the CTD stays A even under a $+25$\,bp/year twist (75\,bp between the 7y and 10y points). Near 6\%, five basis points per year are enough to switch it.
+
+\paragraph{Why we care which bond is delivered in the end.}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Pricing.} The futures price follows the CTD: $F\approx \BF_{\text{CTD}}/K_{\text{CTD}}$ minus the value of the delivery options. Getting the CTD wrong means mispricing $F$ and the basis.
+\item \textbf{Hedging.} The futures DV01 is roughly the CTD's forward DV01 divided by $K_{\text{CTD}}$. To hedge bond $y$ we use $h=\mathrm{DV01}_y\,K_{\text{CTD}}/\mathrm{DV01}_{\text{CTD}}$ contracts. If the CTD switches from A (duration 5.8) to C (duration 8.8), the futures' duration jumps by about 50\%, and a static hedge becomes badly sized. Because $F$ behaves like the minimum of several bond prices, the future is negatively convex.
+\item \textbf{The delivery option and basis trading.} The short holds the switch option and the long has sold it. A long-basis position (long bond, short futures) is long this option, and its P\&L depends on whether, and when, the CTD switches.
+\item \textbf{Physical settlement.} The short must source the bond it delivers, which creates repo specialness and squeeze risk on the CTD. The long receives a specific bond (the one that is cheapest for the short, i.e.\ the least valuable to the long) with its own coupon and duration. The cash paid, $F K_x+\AI_x(T_d)$, depends on which bond arrives.
+\end{itemize}
+
+\end{document}
